@@ -15,6 +15,7 @@ export class VapiVoiceProvider implements VoiceProvider {
     const { body, agentVersion } = buildCreateCallBody(request, {
       phoneNumberId: this.pickPhoneNumberId(),
       agentName: this.env.AGENT_NAME,
+      companyName: this.env.COMPANY_NAME ?? null,
       llmModel: this.env.VAPI_LLM_MODEL,
       voice: {
         provider: this.env.VAPI_VOICE_PROVIDER,

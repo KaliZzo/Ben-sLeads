@@ -90,8 +90,9 @@ curl -X POST localhost:3000/leads/import -H 'content-type: text/csv' --data-bina
    - Register CNAM and STIR/SHAKEN so calls are not flagged as spam.
 2. **Vapi.** Set `VOICE_PROVIDER=vapi` and `VAPI_API_KEY`.
    - The assistant is built from `agent-script.ts` on every call, so there is nothing to configure in the Vapi dashboard.
+   - Set `COMPANY_NAME`. The agent says it at the start of every call; the FCC requires artificial-voice calls to identify the business.
    - Optionally set `VAPI_LLM_MODEL`, `VAPI_VOICE_ID` and `VAPI_VOICE_VERSION` (defaults: `gpt-5.6-terra`, `Layla`, `2`).
-     Set `AGENT_NAME` to match the voice.
+     Set `AGENT_NAME` to the name the agent introduces itself with.
    - To try another voice, set `VAPI_VOICE_PROVIDER=11labs` or `cartesia` with its `VAPI_VOICE_ID` and `VAPI_VOICE_MODEL`.
    - Set `TRANSFER_PHONE_NUMBER` to a person's number so callers who ask for a human are put through.
      Without it, those leads become `NEEDS_HUMAN` in the sheet for someone to call back.

@@ -89,6 +89,7 @@ describe('buildCreateCallBody', () => {
   const options = {
     phoneNumberId: 'pn_1',
     agentName: 'Layla',
+    companyName: null,
     llmModel: 'gpt-5.6-terra',
     voice: { provider: 'vapi' as const, voiceId: 'Layla', version: '2' as const },
     transcriberModel: 'flux-general-en',
@@ -108,10 +109,20 @@ describe('buildCreateCallBody', () => {
     expect(body.assistant.artifactPlan.structuredOutputs[0]).toMatchObject({ name: OUTCOME_OUTPUT_NAME });
   });
 
-  it('waits for the person to answer, then greets them by first name with the configured agent name', () => {
+  it('waits for the person to answer, then plays a fixed opener that names the caller, the business and the reason', () => {
+    const opener = "Hi, is this Dana? This is Layla with the local chimney team, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?";
     expect(body.assistant.firstMessageMode).toBe('assistant-waits-for-user');
-    expect(body.assistant).not.toHaveProperty('firstMessage');
-    expect(prompt).toContain("Hi Dana, it's Layla, following up about your chimney. Do you have a quick minute?");
+    expect(body.assistant.firstMessage).toBe(opener);
+    expect(prompt).toContain(opener);
+  });
+
+  it('names the business when one is configured, and never claims the lead signed up', () => {
+    const { body: named } = buildCreateCallBody({ ...request, leadName: null }, { ...options, companyName: 'Bay Chimney Co' });
+    expect(named.assistant.firstMessage).toBe(
+      "Hi there! This is Layla with Bay Chimney Co, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?",
+    );
+    expect(named.assistant.model.messages[0].content).toContain('Only use the business name "Bay Chimney Co"');
+    expect(prompt).not.toMatch(/you shared your (info|details)/i);
   });
 
   it('hangs up when the agent says its closing line', () => {
@@ -119,8 +130,8 @@ describe('buildCreateCallBody', () => {
     expect(prompt).toContain(END_CALL_PHRASE);
   });
 
-  it('uses the configured model without reasoning, and the Vapi voice version', () => {
-    expect(body.assistant.model).toMatchObject({ provider: 'openai', model: 'gpt-5.6-terra', reasoningEffort: 'none' });
+  it('uses the configured model without reasoning, on the fast tier, and the Vapi voice version', () => {
+    expect(body.assistant.model).toMatchObject({ provider: 'openai', model: 'gpt-5.6-terra', reasoningEffort: 'none', serviceTier: 'fast' });
     expect(body.assistant.voice).toEqual({ provider: 'vapi', voiceId: 'Layla', version: '2' });
   });
 
@@ -129,7 +140,7 @@ describe('buildCreateCallBody', () => {
       ...options,
       voice: { provider: '11labs', voiceId: 'abc', version: '2', model: 'eleven_flash_v2_5' },
     });
-    expect(other.assistant.voice).toEqual({ provider: '11labs', voiceId: 'abc', model: 'eleven_flash_v2_5' });
+    expect(other.assistant.voice).toEqual({ provider: '11labs', voiceId: 'abc', model: 'eleven_flash_v2_5', stability: 0.4 });
   });
 
   it('lets Flux detect the end of a turn, and adds smart endpointing for other transcribers', () => {
@@ -140,8 +151,8 @@ describe('buildCreateCallBody', () => {
     expect(nova.assistant.startSpeakingPlan).toMatchObject({ smartEndpointingPlan: { provider: 'livekit' } });
   });
 
-  it('turns off the fake office noise', () => {
-    expect(body.assistant.backgroundSound).toBe('off');
+  it('plays quiet office ambience so the line never sounds dead', () => {
+    expect(body.assistant.backgroundSound).toBe('office');
   });
 
   it('offers the address check tool, and a transfer only when a number is configured', () => {

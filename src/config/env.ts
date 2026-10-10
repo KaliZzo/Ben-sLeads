@@ -41,6 +41,8 @@ const envSchema = z
     VAPI_TRANSCRIBER_MODEL: z.string().default('flux-general-en'),
     /** The name the agent introduces itself with. Match it to the voice. */
     AGENT_NAME: z.string().min(1).default('Layla'),
+    /** The business named at the start of every call. The FCC requires it for artificial-voice calls. */
+    COMPANY_NAME: z.preprocess((value) => (value === '' ? undefined : value), z.string().optional()),
     /** E.164 number of a person on the team. When set, the agent can transfer callers who ask for a human. */
     TRANSFER_PHONE_NUMBER: z.preprocess(
       (value) => (value === '' ? undefined : value),

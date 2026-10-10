@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { END_CALL_PHRASE, EXPECTED_TERMS, buildSystemPrompt } from '../../agent/agent-script';
+import { END_CALL_PHRASE, EXPECTED_TERMS, buildOpeningLine, buildSystemPrompt } from '../../agent/agent-script';
 import { AGENT_TOOLS } from '../../agent/agent-tools';
 import { callOutcomeJsonSchema, parseCallOutcome } from '../../agent/call-outcome';
 import type { CallDisposition, CallEvent, StartCallRequest, ToolResult } from '../voice-provider';
@@ -12,6 +12,7 @@ export const OUTCOME_OUTPUT_NAME = 'call_outcome';
 export interface VapiCallOptions {
   phoneNumberId: string;
   agentName: string;
+  companyName: string | null;
   llmModel: string;
   voice: { provider: 'vapi' | '11labs' | 'cartesia'; voiceId: string; version: '1' | '2' | 'latest'; model?: string };
   transcriberModel: string;
@@ -26,6 +27,7 @@ export interface VapiCallOptions {
 export function buildCreateCallBody(request: StartCallRequest, options: VapiCallOptions) {
   const systemPrompt = buildSystemPrompt({
     agentName: options.agentName,
+    companyName: options.companyName,
     leadName: request.leadName,
     timezone: request.timezone,
     now: options.now,
@@ -36,17 +38,24 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
 
   const assistant = {
     name: 'outbound-lead-agent',
-    // A person says "Hello?" first; a robocall talks into silence. Waiting also lets the
-    // agent answer call screeners instead of talking over them.
+    // A person says "Hello?" first; a robocall talks into silence. With a fixed first message
+    // the opener plays right after their hello: the model would add about two seconds.
     firstMessageMode: 'assistant-waits-for-user',
+    firstMessage: buildOpeningLine({ agentName: options.agentName, companyName: options.companyName, leadName: request.leadName }),
+    // The opener runs about seven seconds; let them cut in with "who's this?" like they would with a person.
+    firstMessageInterruptionsEnabled: true,
     model: {
       provider: 'openai',
       model: options.llmModel,
       // Terra is a reasoning model and defaults to medium effort. A phone turn has no time to think.
       reasoningEffort: 'none',
-      // Replies are one or two sentences; a cap keeps a runaway answer from talking for half a minute.
-      maxTokens: 150,
-      temperature: 0.4,
+      // The model was the slowest part of every turn (about 0.8s). Fast processing costs 2x tokens,
+      // which is about a cent per call.
+      serviceTier: 'fast',
+      // Replies are up to three sentences; a cap keeps a runaway answer from talking for half a minute.
+      maxTokens: 250,
+      // A little variety keeps the agent from saying the same sentence the same way every time.
+      temperature: 0.6,
       messages: [{ role: 'system', content: systemPrompt }],
       tools: buildTools(options.transferNumber),
     },
@@ -69,8 +78,8 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
     // Two words before the agent yields, so "yeah" or a cough doesn't cut it off mid-sentence.
     // "stop", "wait", "no" and the like still interrupt immediately.
     stopSpeakingPlan: { numWords: 2, voiceSeconds: 0.2, backoffSeconds: 1 },
-    // Fake office noise is a giveaway on a phone call.
-    backgroundSound: 'off',
+    // Quiet office ambience: a dead-silent line sounds like a machine.
+    backgroundSound: 'office',
     hooks: [
       // Nudge once when the line goes quiet, instead of sitting in silence until the call times out.
       {
@@ -113,7 +122,10 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
 
 function buildVoice(voice: VapiCallOptions['voice']) {
   if (voice.provider === 'vapi') return { provider: 'vapi', voiceId: voice.voiceId, version: voice.version };
-  return { provider: voice.provider, voiceId: voice.voiceId, ...(voice.model ? { model: voice.model } : {}) };
+  const model = voice.model ? { model: voice.model } : {};
+  // Lower stability lets the voice rise and fall with the words instead of reading them flat.
+  if (voice.provider === '11labs') return { provider: '11labs', voiceId: voice.voiceId, ...model, stability: 0.4 };
+  return { provider: voice.provider, voiceId: voice.voiceId, ...model };
 }
 
 function buildTools(transferNumber: string | undefined) {
@@ -150,7 +162,8 @@ function buildTools(transferNumber: string | undefined) {
  */
 function agentVersion(assistant: { model: { messages: unknown[] } }, systemPrompt: string, request: StartCallRequest): string {
   const template = systemPrompt.slice(0, systemPrompt.indexOf('# THIS CALL'));
-  const settings = { ...assistant, model: { ...assistant.model, messages: [] }, metadata: undefined, server: undefined };
+  // The opener is part of the prompt template already; its own copy carries the lead's name.
+  const settings = { ...assistant, model: { ...assistant.model, messages: [] }, firstMessage: undefined, metadata: undefined, server: undefined };
   // The opening line inside the template carries the lead's first name; take it out.
   const firstName = request.leadName?.trim().split(/\s+/)[0];
   const normalized = firstName ? template.split(firstName).join('{name}') : template;
