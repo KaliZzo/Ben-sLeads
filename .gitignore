@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+*.tsbuildinfo
+src/generated
+google-service-account.json
+
+# Lead lists hold real people's names, phones and addresses. Never commit them.
+*.csv
+*.xlsx
+
+# Local tool state
+.claude/
+.headroom/

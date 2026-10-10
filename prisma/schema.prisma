@@ -1,0 +1,87 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Where a lead is in its life. Only PENDING leads are dialed.
+enum LeadStatus {
+  PENDING        // waiting for its (next) call at nextAttemptAt
+  CALLING        // a call is live right now
+  BOOKED         // final: customer booked an appointment
+  NOT_INTERESTED // final: customer declined
+  DO_NOT_CALL    // final: customer asked never to be called again
+  UNREACHABLE    // final: ran out of attempts without a decision
+  NEEDS_HUMAN    // a person on the team must follow up; see followUpReason
+}
+
+enum CallStatus {
+  QUEUED      // we asked the provider to place it
+  IN_PROGRESS // the provider reports the call is live
+  ENDED       // the provider reported the end of the call
+  FAILED      // the provider rejected it, or it went stale
+}
+
+model Lead {
+  id                  String     @id @default(uuid())
+  phone               String     @unique /// E.164, e.g. +14155550123
+  altPhone            String? /// E.164; dialed when a call to `phone` is not answered
+  dialAltPhone        Boolean    @default(false) /// the next call goes to altPhone
+  name                String?
+  timezone            String /// IANA zone, e.g. America/New_York
+  consent             Boolean /// prior express written consent to be called (TCPA)
+  importNotes         String? /// free text from the CSV, given to the agent as context
+  status              LeadStatus @default(PENDING)
+  attempts            Int        @default(0)
+  nextAttemptAt       DateTime   @default(now())
+  lastCallAt          DateTime?
+
+  // What the agent collected. Filled when a call ends.
+  meetingAt           DateTime?
+  customerName        String?
+  address             String?
+  zipCode             String?
+  notes               String?
+  notInterestedReason String?
+  callbackAt          DateTime? /// when the customer asked to be called back
+  followUpReason      String? /// why the lead is NEEDS_HUMAN
+
+  // Results sink bookkeeping. `revision` goes up on every outcome change;
+  // the sink is behind while sinkRevision < revision.
+  revision            Int        @default(0)
+  sinkRevision        Int        @default(0)
+  sinkRef             String? /// sink-specific pointer, e.g. a sheet row number
+
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  calls               Call[]
+
+  @@index([status, nextAttemptAt])
+}
+
+model Call {
+  id             String     @id @default(uuid())
+  leadId         String
+  lead           Lead       @relation(fields: [leadId], references: [id])
+  provider       String
+  providerCallId String?    @unique
+  phone          String? /// the number dialed
+  status         CallStatus @default(QUEUED)
+  endedReason    String? /// provider's raw reason, kept for debugging
+  startedAt      DateTime   @default(now())
+  endedAt        DateTime?
+  summary        String?
+  transcript     String?
+  recordingUrl   String?
+  outcome        Json? /// the structured outcome as extracted by the provider
+  agentVersion   String? /// fingerprint of the agent config (prompt, voice, model) that made the call
+  turnLatencyMs  Int? /// average time from the customer finishing to the agent starting to speak
+  metrics        Json? /// the provider's per-turn latency breakdown
+
+  @@index([status, startedAt])
+  @@index([leadId])
+}

@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: talk
+      POSTGRES_PASSWORD: talk
+      POSTGRES_DB: talk
+    ports:
+      - "55442:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
