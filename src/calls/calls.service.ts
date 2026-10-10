@@ -107,6 +107,8 @@ export class CallsService {
           outcome: end.outcome,
           now,
           altPhoneUntried: !!lead.altPhone && !lead.dialAltPhone,
+          dialedAltPhone: lead.dialAltPhone,
+          totalCalls: await tx.call.count({ where: { leadId: lead.id } }),
         },
         { maxAttempts: this.env.MAX_ATTEMPTS, retryDelayMs: this.env.RETRY_DELAY_MINUTES * 60_000 },
       );

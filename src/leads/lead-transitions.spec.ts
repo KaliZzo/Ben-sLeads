@@ -108,6 +108,35 @@ describe('nextLeadState', () => {
     expect(update).toEqual({ status: LeadStatus.PENDING, nextAttemptAt: inOneHour, customerName: 'Dana', dialAltPhone: false });
   });
 
+  describe('platform failure', () => {
+    const inTenMinutes = new Date('2026-10-05T14:10:00Z');
+    const failed = (extra: Partial<Parameters<typeof nextLeadState>[0]>) =>
+      nextLeadState({ attempts: 1, disposition: 'failed', outcome: null, now, ...extra }, { maxAttempts: 1, retryDelayMs: 3_600_000 });
+
+    it('retries in ten minutes and hands back the attempt, even on the last one', () => {
+      expect(failed({ totalCalls: 1 })).toEqual({ status: LeadStatus.PENDING, nextAttemptAt: inTenMinutes, dialAltPhone: false, attempts: 0 });
+    });
+
+    it('retries the second phone without touching attempts, which it never counted', () => {
+      expect(failed({ totalCalls: 2, dialedAltPhone: true })).toEqual({
+        status: LeadStatus.PENDING,
+        nextAttemptAt: inTenMinutes,
+        dialAltPhone: true,
+        attempts: 1,
+      });
+    });
+
+    it('stops retrying once the lead has had enough calls, so a broken setup cannot loop', () => {
+      expect(failed({ totalCalls: 4 })).toEqual({ status: LeadStatus.UNREACHABLE, dialAltPhone: false });
+    });
+
+    it('does not apply to unanswered calls', () => {
+      expect(nextLeadState({ attempts: 1, disposition: 'no-answer', outcome: null, now, totalCalls: 1 }, { maxAttempts: 1, retryDelayMs: 1 }).status).toBe(
+        LeadStatus.UNREACHABLE,
+      );
+    });
+  });
+
   describe('second phone', () => {
     it.each<CallDisposition>(['no-answer', 'busy', 'voicemail', 'failed'])('dials it right away after %s, even on the last attempt', (disposition) => {
       expect(after(disposition, null, 3, true)).toEqual({ status: LeadStatus.PENDING, nextAttemptAt: now, dialAltPhone: true });

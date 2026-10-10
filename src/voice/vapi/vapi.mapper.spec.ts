@@ -138,7 +138,8 @@ describe('buildCreateCallBody', () => {
   });
 
   it('hangs up when the agent says its closing line', () => {
-    expect(body.assistant.endCallPhrases).toEqual([END_CALL_PHRASE]);
+    expect(body.assistant.endCallPhrases).toEqual(['Have a great day. Goodbye']);
+    expect(END_CALL_PHRASE.toLowerCase()).toContain(body.assistant.endCallPhrases[0].toLowerCase());
     expect(prompt).toContain(END_CALL_PHRASE);
   });
 

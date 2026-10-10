@@ -15,11 +15,20 @@ export interface CallResultInput {
   now: Date;
   /** The lead has a second phone that this attempt has not dialed yet. */
   altPhoneUntried?: boolean;
+  /** The call that just ended went to the second phone. */
+  dialedAltPhone?: boolean;
+  /** Calls ever placed to this lead, including the one that just ended. */
+  totalCalls?: number;
 }
+
+/** After a platform failure nobody heard the agent, so the call is retried soon. */
+const PLATFORM_RETRY_DELAY_MS = 10 * 60_000;
 
 /** Fields to write on the lead after a call ends. */
 export interface LeadUpdate {
   status: LeadStatus;
+  /** Set only to hand back an attempt that a platform failure used up. */
+  attempts?: number;
   nextAttemptAt?: Date;
   dialAltPhone?: boolean;
   meetingAt?: Date | null;
@@ -82,6 +91,20 @@ export function nextLeadState(input: CallResultInput, policy: RetryPolicy): Lead
   // Nobody picked up: try the second phone right away, as part of the same attempt.
   if (input.disposition !== 'answered' && input.altPhoneUntried) {
     return { status: LeadStatus.PENDING, nextAttemptAt: input.now, dialAltPhone: true };
+  }
+
+  // The platform failed before anyone heard the agent (a voice or network error, a rejected
+  // request): that was not a real try, so retry soon and hand the attempt back. Capped by the
+  // number of calls, so a broken setup can't keep dialing forever.
+  const callCap = 2 * policy.maxAttempts + 2;
+  if (input.disposition === 'failed' && (input.totalCalls ?? Infinity) < callCap) {
+    return {
+      status: LeadStatus.PENDING,
+      nextAttemptAt: new Date(input.now.getTime() + PLATFORM_RETRY_DELAY_MS),
+      dialAltPhone: !!input.dialedAltPhone,
+      // Dialing the first phone counts an attempt when the call is claimed; the second phone doesn't.
+      attempts: input.dialedAltPhone ? input.attempts : input.attempts - 1,
+    };
   }
 
   // Not answered, voicemail, failed, or answered without a decision: try again later.

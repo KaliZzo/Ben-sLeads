@@ -66,8 +66,9 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
       messages: [{ role: 'system', content: systemPrompt }],
       tools: buildTools(options.transferNumber),
     },
-    // Hangs up when the agent says its closing line, even if it forgets to call endCall.
-    endCallPhrases: [END_CALL_PHRASE],
+    // Hangs up when the agent says its closing line, even if it forgets to call endCall. Without
+    // the final "!" so "Goodbye." matches too: one call stayed open after the agent's goodbye.
+    endCallPhrases: [END_CALL_PHRASE.replace(/[.!]+$/, '')],
     voice: buildVoice(options.voice),
     transcriber: {
       provider: 'deepgram',
@@ -96,9 +97,11 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
     backgroundSound: 'office',
     hooks: [
       // Nudge once when the line goes quiet, instead of sitting in silence until the call times out.
+      // Longer than a call screener's hold (about 23 seconds): at 10 the agent asked "can you hear
+      // me?" into the hold, right before the person might come on.
       {
         on: 'customer.speech.timeout',
-        options: { timeoutSeconds: 10, triggerMaxCount: 1 },
+        options: { timeoutSeconds: 25, triggerMaxCount: 1 },
         do: [{ type: 'say', exact: ['Hello? Are you still there?', 'Hi, can you hear me okay?'] }],
       },
     ],
