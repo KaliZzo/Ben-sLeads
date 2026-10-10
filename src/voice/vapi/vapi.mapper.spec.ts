@@ -109,28 +109,30 @@ describe('buildCreateCallBody', () => {
     expect(body.assistant.artifactPlan.structuredOutputs[0]).toMatchObject({ name: OUTCOME_OUTPUT_NAME });
   });
 
-  it('waits for their hello, then plays the fixed opener: who, which business, why, and a question', () => {
+  it('waits for their hello, then plays the fixed opener: name, apology, a minute, the reason', () => {
     const opener =
-      "Hi! It's Layla from the local chimney team, following up on chimney inspections in your area. When was the last time you had yours checked?";
+      "Hi, my name is Layla. Sorry for the unexpected call. Do you have a quick minute? I'm calling about chimney cleaning and inspection services in your area.";
     expect(body.assistant.firstMessageMode).toBe('assistant-waits-for-user');
     expect(body.assistant.firstMessage).toBe(opener);
     expect(body.assistant.firstMessageInterruptionsEnabled).toBe(true);
     expect(body.assistant.stopSpeakingPlan.interruptionPhrases).toEqual(expect.arrayContaining(['hello', 'who', 'stop', 'wait']));
     expect(prompt).toContain(opener);
-    expect(prompt).not.toContain('twenty seconds');
   });
 
   it('leaves a short message on voicemail and with screeners instead of hanging up', () => {
-    const message = 'Hi, this is Layla from the local chimney team, calling about a free chimney inspection for your home. Sorry I missed you. Have a great day. Goodbye!';
+    const message =
+      'Hi, my name is Layla, calling about chimney cleaning and inspection services in your area. Sorry I missed you. Have a great day. Goodbye!';
     expect(body.assistant.voicemailMessage).toBe(message);
     expect(prompt).toContain(message);
-    expect(prompt).not.toContain("Don't leave a message");
   });
 
-  it('names the business when one is configured, and never claims the lead signed up', () => {
-    const { body: named } = buildCreateCallBody({ ...request, leadName: null }, { ...options, companyName: 'Bay Chimney Co' });
-    expect(named.assistant.firstMessage).toContain("It's Layla from Bay Chimney Co, following up on chimney inspections");
-    expect(named.assistant.model.messages[0].content).toContain('Only use the business name "Bay Chimney Co"');
+  it('gives the company name only when asked, and never invents one', () => {
+    const { body: named } = buildCreateCallBody(request, { ...options, companyName: 'Bay Chimney Co' });
+    const namedPrompt = named.assistant.model.messages[0].content;
+    for (const spoken of [named.assistant.firstMessage, named.assistant.voicemailMessage]) expect(spoken).not.toContain('Bay Chimney Co');
+    expect(namedPrompt.match(/Bay Chimney Co/g)).toHaveLength(1);
+    expect(namedPrompt).toContain(`Only if they ask which company you're with, or the name of the business, say "Bay Chimney Co."`);
+    expect(prompt).toContain('Never make up a company name');
     expect(prompt).not.toMatch(/you shared your (info|details)/i);
   });
 

@@ -49,7 +49,7 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
     // that never speaks gets nothing (4 of 125 calls; on retry they stayed silent, so most
     // are machines). Speaking first also collided with "Hello?" and stuttered.
     firstMessageMode: 'assistant-waits-for-user',
-    firstMessage: buildOpeningLine({ agentName: options.agentName, companyName: options.companyName }),
+    firstMessage: buildOpeningLine({ agentName: options.agentName }),
     // Let them cut in with "who's this?" like they would with a person.
     firstMessageInterruptionsEnabled: true,
     model: {
@@ -110,7 +110,7 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
     // Detection is off by default. Transcript-based, so a call screener's questions are not
     // mistaken for a mailbox greeting. On detection Vapi waits for the beep and leaves this.
     voicemailDetection: { provider: 'vapi', type: 'transcript' },
-    voicemailMessage: buildVoicemailMessage({ agentName: options.agentName, companyName: options.companyName }),
+    voicemailMessage: buildVoicemailMessage({ agentName: options.agentName }),
     serverMessages: ['status-update', 'end-of-call-report', 'tool-calls'],
     // Inline server URLs do not get org credentials, so the secret travels as a header.
     server: { url: options.webhookUrl, headers: { [WEBHOOK_SECRET_HEADER]: options.webhookSecret } },

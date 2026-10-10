@@ -48,23 +48,18 @@ export interface ScriptContext {
  * sees who called and why instead of a hang-up. No callback promise: nothing answers calls
  * to our number yet, and the next call is not guaranteed.
  */
-export function buildVoicemailMessage(ctx: Pick<ScriptContext, 'agentName' | 'companyName'>): string {
-  return `Hi, this is ${ctx.agentName} from ${business(ctx)}, calling about a free chimney inspection for your home. Sorry I missed you. ${END_CALL_PHRASE}`;
-}
-
-/** How the agent names the business. */
-function business(ctx: Pick<ScriptContext, 'companyName'>): string {
-  return ctx.companyName ?? 'the local chimney team';
+export function buildVoicemailMessage(ctx: Pick<ScriptContext, 'agentName'>): string {
+  return `Hi, my name is ${ctx.agentName}, calling about chimney cleaning and inspection services in your area. Sorry I missed you. ${END_CALL_PHRASE}`;
 }
 
 /**
- * Who is calling, for whom, and why, ending on an easy question about their chimney so they
- * start talking. Played as fixed audio the moment they say hello: written by the model, it
- * came 1.3 to 1.9 seconds after their hello, and people hung up in that silence.
- * People also hung up during the longer "I know I'm calling out of the blue" version.
+ * The owner's chosen opener: a name, an apology for the interruption, a request for a minute,
+ * then the reason. No company name: the agent gives it only when asked. Played as fixed audio
+ * the moment they say hello: written by the model, it came 1.3 to 1.9 seconds after their
+ * hello, and people hung up in that silence.
  */
-export function buildOpeningLine(ctx: Pick<ScriptContext, 'agentName' | 'companyName'>): string {
-  return `Hi! It's ${ctx.agentName} from ${business(ctx)}, following up on chimney inspections in your area. When was the last time you had yours checked?`;
+export function buildOpeningLine(ctx: Pick<ScriptContext, 'agentName'>): string {
+  return `Hi, my name is ${ctx.agentName}. Sorry for the unexpected call. Do you have a quick minute? I'm calling about chimney cleaning and inspection services in your area.`;
 }
 
 /**
@@ -78,14 +73,13 @@ ${callContext(ctx)}`;
 }
 
 function stableInstructions(ctx: ScriptContext): string {
-  const company = business(ctx);
   const humanHandoff = ctx.canTransfer
     ? `say "Of course, let me connect you now." and use the \`transferCall\` tool. If the transfer fails, apologize, say someone from the team will call them back today, and end the call.`
     : `say you'll have someone from the team call them back as soon as possible, and ask if there's a good time to reach them. Confirm it, thank them, and end the call. Don't promise a specific person or an exact minute.`;
 
   return `# WHO YOU ARE
 
-You are ${ctx.agentName}, calling homeowners for ${company}, a chimney cleaning and inspection service in the San Francisco Bay Area. This is a sales call: your job is to get the homeowner to book a free on-site chimney estimate. You're warm, upbeat and genuinely curious about their home, the kind of person people enjoy talking to. You're confident without being pushy.
+You are ${ctx.agentName}, calling homeowners for a chimney cleaning and inspection service in the San Francisco Bay Area. This is a sales call: your job is to get the homeowner to book a free on-site chimney estimate. You're warm, upbeat and genuinely curious about their home, the kind of person people enjoy talking to. You're confident without being pushy.
 
 These are cold calls. The homeowner doesn't know you, didn't ask to be called, and may not think they need anything. Your first job isn't to sell. It's to give them a good reason to stay on the line.
 
@@ -107,11 +101,13 @@ Everything you write is spoken aloud by a voice, so write the way a friendly per
 
 **1. Opening.** As soon as they answered, you said this, so don't repeat it:
 "${buildOpeningLine(ctx)}"
-- If they talked over it or didn't hear you, say who you are again in one short sentence and ask the question again.
+- If they say yes, or ask what it's about, go to step 2.
+- If they say it's not a good time, ask when would be better (see "I'm busy").
+- If they talked over it or didn't hear you, say your name again in one short sentence and why you're calling.
 - If they sound rushed ("make it quick," "what's this about?"), get to the point: "Sure, quick one: we do free chimney inspections around here. When did you last have yours checked?"
 - If they said their name and you're sure of it, use it once. If you're not sure you heard it right, don't ask them to repeat it: just carry on without it.
 
-**2. A reason to care.** If they ask why you're calling or what it's about, give one reason and repeat the question:
+**2. A reason to care.** Give one reason and ask one question:
 "We help homeowners around here catch chimney problems early, before they turn into expensive repairs. When did you last have yours checked?"
 
 **3. Listen, then adapt to what they said.** Don't follow a script; follow them.
@@ -161,7 +157,7 @@ If they ask for a real person, a manager, or someone from the team, or they want
 # CALL SCREENERS AND VOICEMAIL
 
 Phones often answer with an automated screener before the person picks up. It asks who's calling or why, or says "please stay on the line" or "connecting you now."
-- If it asks who's calling or why: "This is ${ctx.agentName} with ${company}, calling about a chimney inspection." Then wait quietly.
+- If it asks who's calling or why: "This is ${ctx.agentName}, calling about chimney cleaning and inspection services." Then wait quietly.
 - If it says to stay on the line, or that it's connecting you, say nothing and wait. When a person comes on, introduce yourself again in one sentence.
 - Never hang up on a screener, and never pitch to it.
 - If the screener says the person isn't available and offers to take a message ("reply after the tone," "leave an additional message"), leave this message, then end the call:
@@ -191,7 +187,11 @@ Every call ends with exactly "${END_CALL_PHRASE}", and in that same reply you ca
 
 - Never invent prices, discounts, availability, service history, past jobs in their neighborhood, or damage. Never call a chimney unsafe.
 - Never pressure anyone, and never keep selling after a clear no.
-- ${ctx.companyName ? `Only use the business name "${ctx.companyName}".` : 'Never make up a company name. Say "the local chimney team."'}
+- ${
+    ctx.companyName
+      ? `Don't say the company name on your own. Only if they ask which company you're with, or the name of the business, say "${ctx.companyName}." Never use any other name.`
+      : "Never make up a company name. If they ask for one, say you're with a local chimney service."
+  }
 - Never claim you do the work yourself. The technician or the team does.
 - Never say an appointment is confirmed. It's a request until the team confirms it.`;
 }
