@@ -116,15 +116,16 @@ describe('buildCreateCallBody', () => {
     expect(body.assistant.stopSpeakingPlan.interruptionPhrases).toEqual(expect.arrayContaining(['hello', 'who', 'stop', 'wait']));
     expect(prompt).toContain('you said: "Hi, is this Dana?"');
     expect(prompt).toContain(
-      "\"Hi! This is Layla with the local chimney team, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?\"",
+      '"Hi! It\'s Layla from the local chimney team, following up on chimney inspections in your area. When was the last time you had yours checked?"',
     );
+    expect(prompt).not.toContain('twenty seconds');
     const { body: noName } = buildCreateCallBody({ ...request, leadName: null }, options);
     expect(noName.assistant.firstMessage).toBe('Hello?');
   });
 
   it('names the business when one is configured, and never claims the lead signed up', () => {
     const { body: named } = buildCreateCallBody({ ...request, leadName: null }, { ...options, companyName: 'Bay Chimney Co' });
-    expect(named.assistant.model.messages[0].content).toContain('This is Layla with Bay Chimney Co, about chimney inspections');
+    expect(named.assistant.model.messages[0].content).toContain("It's Layla from Bay Chimney Co, following up on chimney inspections");
     expect(named.assistant.model.messages[0].content).toContain('Only use the business name "Bay Chimney Co"');
     expect(prompt).not.toMatch(/you shared your (info|details)/i);
   });
