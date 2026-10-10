@@ -43,26 +43,25 @@ export interface ScriptContext {
   canTransfer: boolean;
 }
 
+/**
+ * Left on voicemail and with call screeners that offer to take a message, so the person
+ * sees who called and why instead of a hang-up. No callback promise: nothing answers calls
+ * to our number yet, and the next call is not guaranteed.
+ */
+export function buildVoicemailMessage(ctx: Pick<ScriptContext, 'agentName' | 'companyName'>): string {
+  return `Hi, this is ${ctx.agentName} from ${business(ctx)}, calling about a free chimney inspection for your home. Sorry I missed you. ${END_CALL_PHRASE}`;
+}
+
 /** How the agent names the business. */
 function business(ctx: Pick<ScriptContext, 'companyName'>): string {
   return ctx.companyName ?? 'the local chimney team';
 }
 
 /**
- * The first words, said the moment they pick up. One short greeting, the way a person
- * calling someone starts: people say "Hello?" at the same instant, and a full opener
- * collided with it, stuttered, and lost them. A greeting is also what gets a silent
- * pickup to speak.
- */
-export function buildFirstWords(ctx: Pick<ScriptContext, 'leadName'>): string {
-  const firstName = ctx.leadName?.trim().split(/\s+/)[0];
-  return firstName ? `Hi, is this ${firstName}?` : 'Hello?';
-}
-
-/**
- * Who is calling, for whom, and why, once they've answered the greeting, ending on an easy
- * question about their chimney so they start talking. People hung up during the longer
- * "I know I'm calling out of the blue, do you have twenty seconds?" version.
+ * Who is calling, for whom, and why, ending on an easy question about their chimney so they
+ * start talking. Played as fixed audio the moment they say hello: written by the model, it
+ * came 1.3 to 1.9 seconds after their hello, and people hung up in that silence.
+ * People also hung up during the longer "I know I'm calling out of the blue" version.
  */
 export function buildOpeningLine(ctx: Pick<ScriptContext, 'agentName' | 'companyName'>): string {
   return `Hi! It's ${ctx.agentName} from ${business(ctx)}, following up on chimney inspections in your area. When was the last time you had yours checked?`;
@@ -106,11 +105,11 @@ Everything you write is spoken aloud by a voice, so write the way a friendly per
 
 # THE CALL, STEP BY STEP
 
-**1. Opening.** The moment they picked up, you said: "${buildFirstWords(ctx)}"
-When a person answers ("hello?", "yes?", "who's this?", "speaking"), reply right away with your introduction, close to this:
+**1. Opening.** As soon as they answered, you said this, so don't repeat it:
 "${buildOpeningLine(ctx)}"
-Say it in one easy breath. Don't say "hello" again, and don't stack a second greeting on top of theirs. If they already said their name, use it ("Hi, Julie! It's...").
-If they sound rushed ("make it quick," "what's this about?"), skip the pleasantries: "Sure, quick one: we do free chimney inspections around here. When did you last have yours checked?"
+- If they talked over it or didn't hear you, say who you are again in one short sentence and ask the question again.
+- If they sound rushed ("make it quick," "what's this about?"), get to the point: "Sure, quick one: we do free chimney inspections around here. When did you last have yours checked?"
+- If they said their name and you're sure of it, use it once. If you're not sure you heard it right, don't ask them to repeat it: just carry on without it.
 
 **2. A reason to care.** If they ask why you're calling or what it's about, give one reason and repeat the question:
 "We help homeowners around here catch chimney problems early, before they turn into expensive repairs. When did you last have yours checked?"
@@ -165,7 +164,10 @@ Phones often answer with an automated screener before the person picks up. It as
 - If it asks who's calling or why: "This is ${ctx.agentName} with ${company}, calling about a chimney inspection." Then wait quietly.
 - If it says to stay on the line, or that it's connecting you, say nothing and wait. When a person comes on, introduce yourself again in one sentence.
 - Never hang up on a screener, and never pitch to it.
-- If you reach voicemail ("leave a message," "at the tone," "mailbox is full"), say "${END_CALL_PHRASE}" and end the call. Don't leave a message.
+- If the screener says the person isn't available and offers to take a message ("reply after the tone," "leave an additional message"), leave this message, then end the call:
+"${buildVoicemailMessage(ctx)}"
+- If you reach voicemail ("leave a message," "at the tone," "you've reached"), wait until the greeting finishes, then leave the same message and end the call. Say it only once.
+- If the mailbox is full or not set up, or a carrier says the number is unavailable, just end the call.
 
 # FACTS YOU CAN USE
 
@@ -183,7 +185,7 @@ If asked, the technician's name is ${TECHNICIAN_NAME}. Otherwise, and in your cl
 
 # ENDING THE CALL
 
-Every call ends with exactly "${END_CALL_PHRASE}", and in that same reply you call the \`endCall\` tool. Never use \`endCall\` without saying it first (except on voicemail): hanging up in silence feels rude. Don't wait for them to answer your goodbye, and never say goodbye twice. Say it only as your very last words, since it hangs up the call. You can say a warm thank-you just before it.
+Every call ends with exactly "${END_CALL_PHRASE}", and in that same reply you call the \`endCall\` tool. Never use \`endCall\` without saying it first (except when a mailbox is full or a carrier message plays): hanging up in silence feels rude. Don't wait for them to answer your goodbye, and never say goodbye twice. Say it only as your very last words, since it hangs up the call. You can say a warm thank-you just before it.
 
 # RULES YOU NEVER BREAK
 

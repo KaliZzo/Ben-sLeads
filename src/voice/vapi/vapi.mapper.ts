@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { END_CALL_PHRASE, EXPECTED_TERMS, buildFirstWords, buildSystemPrompt } from '../../agent/agent-script';
+import { END_CALL_PHRASE, EXPECTED_TERMS, buildOpeningLine, buildSystemPrompt, buildVoicemailMessage } from '../../agent/agent-script';
 import { AGENT_TOOLS } from '../../agent/agent-tools';
 import { callOutcomeJsonSchema, parseCallOutcome } from '../../agent/call-outcome';
 import type { CallDisposition, CallEvent, StartCallRequest, ToolResult } from '../voice-provider';
@@ -44,11 +44,12 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
 
   const assistant = {
     name: 'outbound-lead-agent',
-    // Speaks first: many people pick up an unknown number and wait silently, and Vapi has no
-    // "speak if they stay quiet" option, so waiting for their hello lost live pickups.
-    // The first words are only a greeting, so a "Hello?" at the same instant doesn't collide.
-    firstMessageMode: 'assistant-speaks-first',
-    firstMessage: buildFirstWords({ leadName: request.leadName }),
+    // Waits for their hello, then plays the fixed opener with no model step: about 0.7s after
+    // their hello instead of 1.3 to 1.9s, the silence people hung up in. The cost: a pickup
+    // that never speaks gets nothing (4 of 125 calls; on retry they stayed silent, so most
+    // are machines). Speaking first also collided with "Hello?" and stuttered.
+    firstMessageMode: 'assistant-waits-for-user',
+    firstMessage: buildOpeningLine({ agentName: options.agentName, companyName: options.companyName }),
     // Let them cut in with "who's this?" like they would with a person.
     firstMessageInterruptionsEnabled: true,
     model: {
@@ -106,9 +107,10 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
       },
     ],
     maxDurationSeconds: 600,
-    // Detection is off by default. With no voicemailMessage set, Vapi hangs up on voicemail.
-    // Transcript-based, so a call screener's questions are not mistaken for a mailbox greeting.
+    // Detection is off by default. Transcript-based, so a call screener's questions are not
+    // mistaken for a mailbox greeting. On detection Vapi waits for the beep and leaves this.
     voicemailDetection: { provider: 'vapi', type: 'transcript' },
+    voicemailMessage: buildVoicemailMessage({ agentName: options.agentName, companyName: options.companyName }),
     serverMessages: ['status-update', 'end-of-call-report', 'tool-calls'],
     // Inline server URLs do not get org credentials, so the secret travels as a header.
     server: { url: options.webhookUrl, headers: { [WEBHOOK_SECRET_HEADER]: options.webhookSecret } },

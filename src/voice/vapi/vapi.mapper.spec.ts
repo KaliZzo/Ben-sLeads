@@ -109,23 +109,27 @@ describe('buildCreateCallBody', () => {
     expect(body.assistant.artifactPlan.structuredOutputs[0]).toMatchObject({ name: OUTCOME_OUTPUT_NAME });
   });
 
-  it('greets right away with a short hello, then introduces itself once they answer', () => {
-    expect(body.assistant.firstMessageMode).toBe('assistant-speaks-first');
-    expect(body.assistant.firstMessage).toBe('Hi, is this Dana?');
+  it('waits for their hello, then plays the fixed opener: who, which business, why, and a question', () => {
+    const opener =
+      "Hi! It's Layla from the local chimney team, following up on chimney inspections in your area. When was the last time you had yours checked?";
+    expect(body.assistant.firstMessageMode).toBe('assistant-waits-for-user');
+    expect(body.assistant.firstMessage).toBe(opener);
     expect(body.assistant.firstMessageInterruptionsEnabled).toBe(true);
     expect(body.assistant.stopSpeakingPlan.interruptionPhrases).toEqual(expect.arrayContaining(['hello', 'who', 'stop', 'wait']));
-    expect(prompt).toContain('you said: "Hi, is this Dana?"');
-    expect(prompt).toContain(
-      '"Hi! It\'s Layla from the local chimney team, following up on chimney inspections in your area. When was the last time you had yours checked?"',
-    );
+    expect(prompt).toContain(opener);
     expect(prompt).not.toContain('twenty seconds');
-    const { body: noName } = buildCreateCallBody({ ...request, leadName: null }, options);
-    expect(noName.assistant.firstMessage).toBe('Hello?');
+  });
+
+  it('leaves a short message on voicemail and with screeners instead of hanging up', () => {
+    const message = 'Hi, this is Layla from the local chimney team, calling about a free chimney inspection for your home. Sorry I missed you. Have a great day. Goodbye!';
+    expect(body.assistant.voicemailMessage).toBe(message);
+    expect(prompt).toContain(message);
+    expect(prompt).not.toContain("Don't leave a message");
   });
 
   it('names the business when one is configured, and never claims the lead signed up', () => {
     const { body: named } = buildCreateCallBody({ ...request, leadName: null }, { ...options, companyName: 'Bay Chimney Co' });
-    expect(named.assistant.model.messages[0].content).toContain("It's Layla from Bay Chimney Co, following up on chimney inspections");
+    expect(named.assistant.firstMessage).toContain("It's Layla from Bay Chimney Co, following up on chimney inspections");
     expect(named.assistant.model.messages[0].content).toContain('Only use the business name "Bay Chimney Co"');
     expect(prompt).not.toMatch(/you shared your (info|details)/i);
   });
