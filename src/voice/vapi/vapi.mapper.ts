@@ -23,6 +23,12 @@ export interface VapiCallOptions {
   now: Date;
 }
 
+/** Setting interruptionPhrases replaces Vapi's list, so it is repeated here. */
+const VAPI_DEFAULT_INTERRUPTION_PHRASES = [
+  'stop', 'shut', 'up', 'enough', 'quiet', 'silence', 'but', 'dont', 'not', 'no',
+  'hold', 'wait', 'cut', 'pause', 'nope', 'nah', 'nevermind', 'never', 'bad', 'actually',
+];
+
 /** Body for POST https://api.vapi.ai/call with a transient (inline) assistant. */
 export function buildCreateCallBody(request: StartCallRequest, options: VapiCallOptions) {
   const systemPrompt = buildSystemPrompt({
@@ -77,7 +83,14 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
     },
     // Two words before the agent yields, so "yeah" or a cough doesn't cut it off mid-sentence.
     // "stop", "wait", "no" and the like still interrupt immediately.
-    stopSpeakingPlan: { numWords: 2, voiceSeconds: 0.2, backoffSeconds: 1 },
+    stopSpeakingPlan: {
+      numWords: 2,
+      voiceSeconds: 0.2,
+      backoffSeconds: 1,
+      // Vapi's defaults, plus greetings: people say "hello?" right as the opener starts, and
+      // an agent that talks over it gets hung up on.
+      interruptionPhrases: [...VAPI_DEFAULT_INTERRUPTION_PHRASES, 'hello', 'hi', 'hey', 'who'],
+    },
     // Quiet office ambience: a dead-silent line sounds like a machine.
     backgroundSound: 'office',
     hooks: [
