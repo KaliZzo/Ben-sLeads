@@ -23,6 +23,18 @@ const HEADER = [
   'Call Back At',
 ];
 const LAST_COLUMN = String.fromCharCode('A'.charCodeAt(0) + HEADER.length - 1);
+const LEAD_ID_COLUMN = HEADER.indexOf('Lead ID');
+/** Wide enough to see notes typed to the right of our columns, so a new row never lands on them. */
+const SCAN_LAST_COLUMN = 'Z';
+
+/**
+ * The 1-based row for a lead: the row already holding its Lead ID, or the first row after
+ * everything in the sheet. `rows` is the sheet from row 1, header included.
+ */
+export function rowFor(rows: unknown[][], leadId: string): number {
+  const index = rows.findIndex((row, i) => i > 0 && row[LEAD_ID_COLUMN] === leadId);
+  return index >= 0 ? index + 1 : Math.max(rows.length, 1) + 1;
+}
 
 /** One row per lead in a single tab. The row number is the ref we keep in the database. */
 export class GoogleSheetsSink implements LeadSink {
@@ -43,29 +55,27 @@ export class GoogleSheetsSink implements LeadSink {
     this.tab = env.GOOGLE_SHEETS_TAB;
   }
 
-  async upsert(lead: LeadView, ref: string | null): Promise<string> {
+  /**
+   * Writes the lead to its own row, always starting at column A. The row is found by Lead ID,
+   * so sorting the sheet or typing notes in it never sends an update to the wrong row.
+   * Not `values.append`: it continues "the table" it detects, which shifts columns as soon as
+   * a row starts somewhere other than column A.
+   */
+  async upsert(lead: LeadView): Promise<string> {
     await this.ensureHeader();
-    // RAW, not USER_ENTERED: text the customer said must never be evaluated as a formula.
-    const values = [toRow(lead)];
-
-    if (ref) {
-      await this.sheets.spreadsheets.values.update({
-        spreadsheetId: this.spreadsheetId,
-        range: `${this.tab}!A${ref}:${LAST_COLUMN}${ref}`,
-        valueInputOption: 'RAW',
-        requestBody: { values },
-      });
-      return ref;
-    }
-
-    const response = await this.sheets.spreadsheets.values.append({
+    const current = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${this.tab}!A:${LAST_COLUMN}`,
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: { values },
+      range: `${this.tab}!A:${SCAN_LAST_COLUMN}`,
     });
-    return rowNumberOf(response.data.updates?.updatedRange);
+    const row = String(rowFor(current.data.values ?? [], lead.id));
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `${this.tab}!A${row}:${LAST_COLUMN}${row}`,
+      // RAW, not USER_ENTERED: text the customer said must never be evaluated as a formula.
+      valueInputOption: 'RAW',
+      requestBody: { values: [toRow(lead)] },
+    });
+    return row;
   }
 
   private async ensureHeader(): Promise<void> {
@@ -120,11 +130,4 @@ export function formatInZone(date: Date | null, timeZone: string): string {
     minute: '2-digit',
     timeZoneName: 'short',
   });
-}
-
-/** "Leads!A7:M7" -> "7" */
-function rowNumberOf(updatedRange: string | null | undefined): string {
-  const match = updatedRange?.match(/![A-Z]+(\d+)/);
-  if (!match) throw new Error(`Unexpected range from Sheets append: ${updatedRange}`);
-  return match[1];
 }
