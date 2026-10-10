@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { END_CALL_PHRASE, EXPECTED_TERMS, buildOpeningLine, buildSystemPrompt } from '../../agent/agent-script';
+import { END_CALL_PHRASE, EXPECTED_TERMS, buildFirstWords, buildSystemPrompt } from '../../agent/agent-script';
 import { AGENT_TOOLS } from '../../agent/agent-tools';
 import { callOutcomeJsonSchema, parseCallOutcome } from '../../agent/call-outcome';
 import type { CallDisposition, CallEvent, StartCallRequest, ToolResult } from '../voice-provider';
@@ -46,9 +46,10 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
     name: 'outbound-lead-agent',
     // Speaks first: many people pick up an unknown number and wait silently, and Vapi has no
     // "speak if they stay quiet" option, so waiting for their hello lost live pickups.
+    // The first words are only a greeting, so a "Hello?" at the same instant doesn't collide.
     firstMessageMode: 'assistant-speaks-first',
-    firstMessage: buildOpeningLine({ agentName: options.agentName, companyName: options.companyName, leadName: request.leadName }),
-    // The opener runs about seven seconds; let them cut in with "hello?" or "who's this?" like they would with a person.
+    firstMessage: buildFirstWords({ leadName: request.leadName }),
+    // Let them cut in with "who's this?" like they would with a person.
     firstMessageInterruptionsEnabled: true,
     model: {
       provider: 'openai',

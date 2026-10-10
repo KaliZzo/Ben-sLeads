@@ -109,20 +109,22 @@ describe('buildCreateCallBody', () => {
     expect(body.assistant.artifactPlan.structuredOutputs[0]).toMatchObject({ name: OUTCOME_OUTPUT_NAME });
   });
 
-  it('opens right away with a fixed, interruptible opener that names the caller, the business and the reason', () => {
-    const opener = "Hi, is this Dana? This is Layla with the local chimney team, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?";
+  it('greets right away with a short hello, then introduces itself once they answer', () => {
     expect(body.assistant.firstMessageMode).toBe('assistant-speaks-first');
+    expect(body.assistant.firstMessage).toBe('Hi, is this Dana?');
     expect(body.assistant.firstMessageInterruptionsEnabled).toBe(true);
     expect(body.assistant.stopSpeakingPlan.interruptionPhrases).toEqual(expect.arrayContaining(['hello', 'who', 'stop', 'wait']));
-    expect(body.assistant.firstMessage).toBe(opener);
-    expect(prompt).toContain(opener);
+    expect(prompt).toContain('you said: "Hi, is this Dana?"');
+    expect(prompt).toContain(
+      "\"Hi! This is Layla with the local chimney team, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?\"",
+    );
+    const { body: noName } = buildCreateCallBody({ ...request, leadName: null }, options);
+    expect(noName.assistant.firstMessage).toBe('Hello?');
   });
 
   it('names the business when one is configured, and never claims the lead signed up', () => {
     const { body: named } = buildCreateCallBody({ ...request, leadName: null }, { ...options, companyName: 'Bay Chimney Co' });
-    expect(named.assistant.firstMessage).toBe(
-      "Hi there! This is Layla with Bay Chimney Co, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?",
-    );
+    expect(named.assistant.model.messages[0].content).toContain('This is Layla with Bay Chimney Co, about chimney inspections');
     expect(named.assistant.model.messages[0].content).toContain('Only use the business name "Bay Chimney Co"');
     expect(prompt).not.toMatch(/you shared your (info|details)/i);
   });

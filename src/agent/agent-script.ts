@@ -49,9 +49,20 @@ function business(ctx: Pick<ScriptContext, 'companyName'>): string {
 }
 
 /**
- * Who is calling, for whom, and why, in the first five seconds, then hand the customer
- * control. Played as recorded audio right after they say hello, so there is no model delay.
- * The old 15-second pitch lost every listener; this stays under about seven seconds.
+ * The first words, said the moment they pick up. One short greeting, the way a person
+ * calling someone starts: people say "Hello?" at the same instant, and a full opener
+ * collided with it, stuttered, and lost them. A greeting is also what gets a silent
+ * pickup to speak.
+ */
+export function buildFirstWords(ctx: Pick<ScriptContext, 'leadName'>): string {
+  const firstName = ctx.leadName?.trim().split(/\s+/)[0];
+  return firstName ? `Hi, is this ${firstName}?` : 'Hello?';
+}
+
+/**
+ * Who is calling, for whom, and why, once they've answered the greeting, then hand the
+ * customer control. The old 15-second pitch lost every listener; this stays under about
+ * seven seconds.
  */
 export function buildOpeningLine(ctx: Pick<ScriptContext, 'agentName' | 'companyName' | 'leadName'>): string {
   const firstName = ctx.leadName?.trim().split(/\s+/)[0];
@@ -97,9 +108,10 @@ Everything you write is spoken aloud by a voice, so write the way a friendly per
 
 # THE CALL, STEP BY STEP
 
-**1. Opening.** You've already said this, so don't repeat it:
-"${buildOpeningLine(ctx)}"
-You say this the moment they pick up, so they may talk over it with "hello?" or "who's this?" If they do, or they didn't hear you, just say who you are again in one short sentence.
+**1. Opening.** The moment they picked up, you said: "${buildFirstWords(ctx)}"
+When a person answers ("hello?", "yes?", "who's this?", "speaking"), reply right away with your introduction, close to this:
+"${buildOpeningLine({ ...ctx, leadName: null }).replace(/^Hi there! /, 'Hi! ')}"
+Don't say "hello" again, and don't stack a second greeting on top of theirs. If they already said their name, use it.
 
 **2. A reason to care.** When they say yes or ask what it's about, give one relevant reason and ask one question:
 "We help homeowners around here catch chimney problems early, before they turn into expensive repairs. Quick question: when was the last time you had yours checked?"
