@@ -109,9 +109,10 @@ describe('buildCreateCallBody', () => {
     expect(body.assistant.artifactPlan.structuredOutputs[0]).toMatchObject({ name: OUTCOME_OUTPUT_NAME });
   });
 
-  it('waits for the person to answer, then plays a fixed opener that names the caller, the business and the reason', () => {
+  it('opens right away with a fixed, interruptible opener that names the caller, the business and the reason', () => {
     const opener = "Hi, is this Dana? This is Layla with the local chimney team, about chimney inspections in your area. I know I'm calling out of the blue. Do you have twenty seconds?";
-    expect(body.assistant.firstMessageMode).toBe('assistant-waits-for-user');
+    expect(body.assistant.firstMessageMode).toBe('assistant-speaks-first');
+    expect(body.assistant.firstMessageInterruptionsEnabled).toBe(true);
     expect(body.assistant.firstMessage).toBe(opener);
     expect(prompt).toContain(opener);
   });

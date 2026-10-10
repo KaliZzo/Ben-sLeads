@@ -38,11 +38,11 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
 
   const assistant = {
     name: 'outbound-lead-agent',
-    // A person says "Hello?" first; a robocall talks into silence. With a fixed first message
-    // the opener plays right after their hello: the model would add about two seconds.
-    firstMessageMode: 'assistant-waits-for-user',
+    // Speaks first: many people pick up an unknown number and wait silently, and Vapi has no
+    // "speak if they stay quiet" option, so waiting for their hello lost live pickups.
+    firstMessageMode: 'assistant-speaks-first',
     firstMessage: buildOpeningLine({ agentName: options.agentName, companyName: options.companyName, leadName: request.leadName }),
-    // The opener runs about seven seconds; let them cut in with "who's this?" like they would with a person.
+    // The opener runs about seven seconds; let them cut in with "hello?" or "who's this?" like they would with a person.
     firstMessageInterruptionsEnabled: true,
     model: {
       provider: 'openai',
