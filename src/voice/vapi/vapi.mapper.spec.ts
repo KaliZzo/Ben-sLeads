@@ -181,8 +181,10 @@ describe('buildCreateCallBody', () => {
 
   it("tells the agent the current time and the coming dates in the lead's timezone", () => {
     expect(prompt).toContain('Monday, October 5, 2026 at 10:00 AM (America/Los_Angeles)');
-    expect(prompt).toContain('- Tuesday, October 6 (tomorrow)');
-    expect(prompt).toContain('- Sunday, October 18');
+    expect(prompt).toContain('- Tuesday, October 6: say "tomorrow"');
+    expect(prompt).toContain('- Thursday, October 8: say "this Thursday"');
+    expect(prompt).toContain('- Sunday, October 18: say "next Sunday"');
+    expect(prompt).toContain('Never say "AM," "PM"');
   });
 
   it('includes what earlier calls were about', () => {
