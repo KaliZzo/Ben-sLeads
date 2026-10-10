@@ -165,6 +165,7 @@ describe('buildCreateCallBody', () => {
   it('lets Flux detect the end of a turn, and adds smart endpointing for other transcribers', () => {
     expect(body.assistant.transcriber).toMatchObject({ provider: 'deepgram', model: 'flux-general-en' });
     expect(body.assistant.transcriber.keyterm).toContain('chimney');
+    expect(body.assistant.transcriber).toMatchObject({ eotTimeoutMs: 3000 });
     expect(body.assistant.startSpeakingPlan).not.toHaveProperty('smartEndpointingPlan');
     const { body: nova } = buildCreateCallBody(request, { ...options, transcriberModel: 'nova-3' });
     expect(nova.assistant.startSpeakingPlan).toMatchObject({ smartEndpointingPlan: { provider: 'livekit' } });

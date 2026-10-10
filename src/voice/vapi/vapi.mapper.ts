@@ -77,6 +77,10 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
       language: 'en',
       // Without these the transcriber heard "AI" as "HeyEye" and garbled street names.
       keyterm: EXPECTED_TERMS,
+      // A turn ends at most 3s after speech, whatever Flux's confidence (default 5s). After a
+      // call screener's hold the person's "Hello? Who's calling?" sat in one open turn with the
+      // screener's words, and the agent answered 16 seconds later; the person said no.
+      ...(options.transcriberModel.startsWith('flux') ? { eotTimeoutMs: 3000 } : {}),
     },
     // Measured before: replies started 1.5s (median) to 2.9s (p90) after the customer stopped.
     startSpeakingPlan: {
@@ -107,9 +111,12 @@ export function buildCreateCallBody(request: StartCallRequest, options: VapiCall
       },
     ],
     maxDurationSeconds: 600,
-    // Detection is off by default. Transcript-based, so a call screener's questions are not
-    // mistaken for a mailbox greeting. On detection Vapi waits for the beep and leaves this.
-    voicemailDetection: { provider: 'vapi', type: 'transcript' },
+    // Detection is off by default. On detection Vapi waits for the beep and leaves this message.
+    // Audio-based (Vapi's default): the transcript-based check only fired after the agent's
+    // opener had already played into short greetings like "Hi, it's Laurie", so the recording
+    // got half an opener before the message. Audio detection did not mistake call screeners
+    // for voicemail in earlier calls.
+    voicemailDetection: { provider: 'vapi', type: 'audio' },
     voicemailMessage: buildVoicemailMessage({ agentName: options.agentName }),
     serverMessages: ['status-update', 'end-of-call-report', 'tool-calls'],
     // Inline server URLs do not get org credentials, so the secret travels as a header.
