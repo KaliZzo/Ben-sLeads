@@ -12,3 +12,6 @@ google-service-account.json
 # Local tool state
 .claude/
 .headroom/
+
+# Call recordings contain customers' voices and addresses. Never commit them.
+recordings/
