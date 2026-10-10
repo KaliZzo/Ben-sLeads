@@ -130,7 +130,8 @@ function buildVoice(voice: VapiCallOptions['voice']) {
 
 function buildTools(transferNumber: string | undefined) {
   const tools: Record<string, unknown>[] = [
-    { type: 'endCall' },
+    // Silent: without a message Vapi says a filler like "Goodbye." after the agent's own goodbye.
+    { type: 'endCall', messages: [{ type: 'request-start', content: '' }] },
     ...AGENT_TOOLS.map((tool) => ({
       type: 'function',
       function: { name: tool.name, description: tool.description, parameters: tool.parameters },

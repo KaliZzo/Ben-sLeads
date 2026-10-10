@@ -125,6 +125,13 @@ describe('buildCreateCallBody', () => {
     expect(prompt).not.toMatch(/you shared your (info|details)/i);
   });
 
+  it("doesn't volunteer that it's an AI, but admits it when asked and offers a person", () => {
+    expect(body.assistant.firstMessage).not.toMatch(/\bAI\b|assistant/i);
+    expect(prompt).toContain('only talk about being an AI if the customer asks');
+    expect(prompt).toContain('never deny it');
+    expect(prompt).toContain('I can have someone call you back as soon as possible');
+  });
+
   it('hangs up when the agent says its closing line', () => {
     expect(body.assistant.endCallPhrases).toEqual([END_CALL_PHRASE]);
     expect(prompt).toContain(END_CALL_PHRASE);
